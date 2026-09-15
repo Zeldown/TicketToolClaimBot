@@ -1,0 +1,41 @@
+plugins {
+	id 'java'
+	id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'fr.zeldown.ticketbot'
+version = '1.0.0'
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_1_8
+	targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation('net.dv8tion:JDA:6.6.0') {
+		exclude module: 'opus-java'
+		exclude module: 'tink'
+	}
+	implementation 'com.google.code.gson:gson:2.14.0'
+	implementation 'org.slf4j:slf4j-simple:2.0.19'
+
+	compileOnly 'org.projectlombok:lombok:1.18.48'
+	annotationProcessor 'org.projectlombok:lombok:1.18.48'
+}
+
+tasks.withType(JavaCompile) {
+	options.encoding = 'UTF-8'
+}
+
+shadowJar {
+	archiveFileName = 'TicketToolClaimBot.jar'
+	manifest {
+		attributes 'Main-Class': 'fr.zeldown.ticketbot.TicketBot'
+	}
+}
+
+build.dependsOn shadowJar
