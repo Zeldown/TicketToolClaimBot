@@ -8,6 +8,8 @@ import fr.zeldown.ticketbot.message.Placeholders;
 import fr.zeldown.ticketbot.message.TicketMessage;
 import fr.zeldown.ticketbot.ticket.TicketService;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
@@ -25,8 +27,18 @@ public final class TicketMessageListener extends ListenerAdapter {
 			return;
 		}
 
-		event.getMessage().delete().queueAfter(TicketMessageListener.DELETE_DELAY, TimeUnit.SECONDS);
-		event.getChannel().sendMessageEmbeds(TicketBot.inst().getMessages().embed(type, TicketMessage.CLAIM_REQUIRED, Placeholders.create().member("staff", member, tickets.rank(type, member)))).queue(warning -> warning.delete().queueAfter(TicketMessageListener.WARNING_DELAY, TimeUnit.SECONDS));
+		event.getJDA().getGatewayPool().schedule(() -> this.enforce(type, member, event.getMessage()), TicketMessageListener.DELETE_DELAY, TimeUnit.SECONDS);
+	}
+
+	private void enforce(final TypeConfig type, final Member member, final Message message) {
+		final TicketService tickets = TicketBot.inst().getTickets();
+		final TextChannel channel = message.getChannel().asTextChannel();
+		message.delete().queue(null, error -> {});
+		if (!tickets.isWaiting(channel)) {
+			return;
+		}
+
+		channel.sendMessageEmbeds(TicketBot.inst().getMessages().embed(type, TicketMessage.CLAIM_REQUIRED, Placeholders.create().member("staff", member, tickets.rank(type, member)))).queue(warning -> warning.delete().queueAfter(TicketMessageListener.WARNING_DELAY, TimeUnit.SECONDS));
 	}
 
 }
