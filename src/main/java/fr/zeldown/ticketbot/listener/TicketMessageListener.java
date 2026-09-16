@@ -21,7 +21,7 @@ public final class TicketMessageListener extends ListenerAdapter {
 		final Member member = event.getMember();
 		final TicketService tickets = TicketBot.inst().getTickets();
 		final TypeConfig type = event.isFromGuild() ? tickets.type(event.getChannel()) : null;
-		if (type == null || member == null || event.getAuthor().isBot() || !tickets.isEnabled(type) || !tickets.isStaff(type, member) || tickets.isBypass(type, member) || !tickets.isWaiting(event.getChannel().asTextChannel())) {
+		if (type == null || member == null || event.getAuthor().isBot() || !tickets.isEnabled(type) || !tickets.isStaff(type, member) || !tickets.isWaiting(event.getChannel().asTextChannel())) {
 			return;
 		}
 

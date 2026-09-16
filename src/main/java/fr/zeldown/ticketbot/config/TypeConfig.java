@@ -18,8 +18,8 @@ public final class TypeConfig extends ScopeConfig {
 	private long                    staffRole;
 	private Set<Long>               ranks = new LinkedHashSet<>();
 	private Set<Long>               categories = new LinkedHashSet<>();
-	private Set<Long>               bypassRoles = new LinkedHashSet<>();
 	private Set<Long>               blacklistRoles = new LinkedHashSet<>();
+	private Set<Long>               supervisorRoles = new LinkedHashSet<>();
 	private Set<Long>               closeCategories = new LinkedHashSet<>();
 	private Map<String, TicketTeam> teams = new LinkedHashMap<>();
 
@@ -29,7 +29,7 @@ public final class TypeConfig extends ScopeConfig {
 	}
 
 	public @NonNull Set<Long> roles() {
-		final Set<Long> roles = new LinkedHashSet<>(this.bypassRoles);
+		final Set<Long> roles = new LinkedHashSet<>(this.supervisorRoles);
 		for (final TicketTeam team : this.teams.values()) {
 			roles.addAll(team.getRoles());
 		}

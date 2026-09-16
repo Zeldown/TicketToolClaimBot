@@ -94,10 +94,6 @@ public final class TicketService {
 		return member.hasPermission(Permission.ADMINISTRATOR) || this.find(member, type.roles()) != null;
 	}
 
-	public boolean isBypass(final @NonNull TypeConfig type, final @NonNull Member member) {
-		return this.find(member, type.getBypassRoles()) != null;
-	}
-
 	public @NonNull CompletableFuture<List<Long>> humans(final @NonNull TextChannel channel) {
 		final List<PermissionOverride> overrides = channel.getMemberPermissionOverrides();
 		if (overrides.isEmpty()) {
@@ -291,7 +287,7 @@ public final class TicketService {
 		final Set<Long> roles = type.roles();
 		final PermissionEditor editor = this.editor(type, ticket.getChannel());
 		for (final PermissionOverride override : ticket.getChannel().getRolePermissionOverrides()) {
-			if (roles.contains(override.getIdLong()) && !type.getBypassRoles().contains(override.getIdLong()) && !kept.contains(override.getIdLong())) {
+			if (roles.contains(override.getIdLong()) && !type.getSupervisorRoles().contains(override.getIdLong()) && !kept.contains(override.getIdLong())) {
 				editor.denyRole(override.getIdLong(), Permission.VIEW_CHANNEL);
 			}
 		}
@@ -304,7 +300,7 @@ public final class TicketService {
 
 	private @NonNull PermissionEditor editor(final @NonNull TypeConfig type, final @NonNull TextChannel channel) {
 		final PermissionEditor editor = PermissionEditor.of(channel);
-		for (final long role : type.getBypassRoles()) {
+		for (final long role : type.getSupervisorRoles()) {
 			if (this.exists(channel, role)) {
 				editor.grantRole(role, TicketService.ACCESS);
 			}
