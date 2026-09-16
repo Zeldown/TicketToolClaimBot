@@ -81,9 +81,7 @@ public final class TicketAdminCommand implements SlashCommand {
 		this.handlers.put("category remove", event -> this.editCategory(event, false));
 		this.handlers.put("rank add", event -> this.editSet(event, "role", TypeConfig::getRanks, true, "grades"));
 		this.handlers.put("rank remove", event -> this.editSet(event, "role", TypeConfig::getRanks, false, "grades"));
-		this.handlers.put("blacklist add", event -> this.editSet(event, "role", TypeConfig::getBlacklistRoles, true, "rôles blacklist"));
 		this.handlers.put("close add", event -> this.editSet(event, "category", TypeConfig::getCloseCategories, true, "catégories fermées"));
-		this.handlers.put("blacklist remove", event -> this.editSet(event, "role", TypeConfig::getBlacklistRoles, false, "rôles blacklist"));
 		this.handlers.put("supervisor add", event -> this.editSet(event, "role", TypeConfig::getSupervisorRoles, true, "rôles superviseurs"));
 		this.handlers.put("close remove", event -> this.editSet(event, "category", TypeConfig::getCloseCategories, false, "catégories fermées"));
 		this.handlers.put("supervisor remove", event -> this.editSet(event, "role", TypeConfig::getSupervisorRoles, false, "rôles superviseurs"));
@@ -132,10 +130,6 @@ public final class TicketAdminCommand implements SlashCommand {
 				new SubcommandGroupData("supervisor", "Gérer les rôles ayant toujours accès aux tickets d'un type").addSubcommands(
 						new SubcommandData("add", "Donner à un rôle l'accès permanent aux tickets").addOptions(type, role),
 						new SubcommandData("remove", "Retirer l'accès permanent d'un rôle").addOptions(type, role)
-						),
-				new SubcommandGroupData("blacklist", "Gérer les rôles ne pouvant jamais voir les tickets d'un type").addSubcommands(
-						new SubcommandData("add", "Interdire l'accès aux tickets à un rôle").addOptions(type, role),
-						new SubcommandData("remove", "Lever l'interdiction d'accès d'un rôle").addOptions(type, role)
 						),
 				new SubcommandGroupData("team", "Gérer les équipes de transfert d'un type").addSubcommands(
 						new SubcommandData("create", "Créer une équipe de transfert").addOptions(type).addOption(OptionType.STRING, "id", "Identifiant unique, par exemple modo", true).addOption(OptionType.STRING, "name", "Nom affiché, par exemple Modération", true).addOptions(role),
@@ -273,7 +267,6 @@ public final class TicketAdminCommand implements SlashCommand {
 			.addField("Catégories fermées", TicketAdminCommand.fallback(TicketAdminCommand.mentions(type.getCloseCategories(), "#")), false)
 			.addField("Grades", TicketAdminCommand.fallback(TicketAdminCommand.mentions(type.getRanks(), "@&")), false)
 			.addField("Rôles superviseurs", TicketAdminCommand.fallback(TicketAdminCommand.mentions(type.getSupervisorRoles(), "@&")), false)
-			.addField("Rôles blacklist", TicketAdminCommand.fallback(TicketAdminCommand.mentions(type.getBlacklistRoles(), "@&")), false)
 			.addField("Équipes", TicketAdminCommand.fallback(type.getTeams().entrySet().stream().map(entry -> "`" + entry.getKey() + "` **" + entry.getValue().getName() + "** : " + TicketAdminCommand.mentions(entry.getValue().getRoles(), "@&")).collect(Collectors.joining("\n"))), false);
 		} else {
 			embed.addField("Types", TicketAdminCommand.fallback(TicketBot.inst().getConfig().types().stream().map(type -> "`" + type.getId() + "` " + (type.isEnabled() ? "Activé" : "Désactivé") + " · " + type.getCategories().size() + " catégorie(s)").collect(Collectors.joining("\n"))), false);

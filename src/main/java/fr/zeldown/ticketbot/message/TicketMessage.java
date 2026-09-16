@@ -23,7 +23,6 @@ public enum TicketMessage {
 	NOT_ADDED("not-added", "{user} ne fait pas partie de ce ticket."),
 	NOT_MEMBER("not-member", "{user} n'est pas membre du serveur."),
 	BOT_TARGET("bot-target", "Cette action ne peut pas cibler un bot."),
-	BLACKLISTED("blacklisted", "{user} possède un rôle qui n'est pas autorisé à accéder aux tickets."),
 	REMOVE_OWNER("remove-owner", "{user} est l'auteur de ce ticket et ne peut pas en être retiré."),
 	REMOVE_SELF("remove-self", "Vous ne pouvez pas vous retirer vous-même du ticket, utilisez plutôt `/ticket-transfer`."),
 	UNKNOWN_TEAM("unknown-team", "L'équipe **{team}** n'existe pas ou aucun rôle ne lui est assigné."),

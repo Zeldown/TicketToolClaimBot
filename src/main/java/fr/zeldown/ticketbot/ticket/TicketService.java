@@ -159,10 +159,6 @@ public final class TicketService {
 
 	public @NonNull CompletableFuture<Message> add(final @NonNull Ticket ticket, final @NonNull Member staff, final @NonNull Member target) {
 		final Placeholders placeholders = this.target(ticket, staff, target);
-		if (this.find(target, ticket.getType().getBlacklistRoles()) != null) {
-			throw new TicketException(TicketMessage.BLACKLISTED, placeholders);
-		}
-
 		if (ticket.override(target.getIdLong()) != null) {
 			throw new TicketException(TicketMessage.ALREADY_ADDED, placeholders);
 		}
@@ -195,7 +191,7 @@ public final class TicketService {
 
 	public @NonNull CompletableFuture<Message> transfer(final @NonNull Ticket ticket, final @NonNull Member staff, final @NonNull String id, final @NonNull String reason) {
 		final TicketTeam team = ticket.getType().getTeams().get(id);
-		final Set<Long> roles = team == null ? Collections.emptySet() : team.getRoles().stream().filter(role -> !ticket.getType().getBlacklistRoles().contains(role) && this.exists(ticket.getChannel(), role)).collect(Collectors.toCollection(LinkedHashSet::new));
+		final Set<Long> roles = team == null ? Collections.emptySet() : team.getRoles().stream().filter(role -> this.exists(ticket.getChannel(), role)).collect(Collectors.toCollection(LinkedHashSet::new));
 		if (roles.isEmpty()) {
 			throw new TicketException(TicketMessage.UNKNOWN_TEAM, Placeholders.create().text("team", id));
 		}
@@ -223,7 +219,6 @@ public final class TicketService {
 		final Set<Long> roles = type.roles();
 		final PermissionEditor editor = PermissionEditor.of(channel);
 		final List<Long> members = previous.entrySet().stream().filter(entry -> !entry.getValue().isRole()).map(Map.Entry::getKey).collect(Collectors.toList());
-		roles.addAll(type.getBlacklistRoles());
 		for (final Map.Entry<Long, PermissionSnapshot> entry : previous.entrySet()) {
 			if (entry.getValue().isRole() && roles.contains(entry.getKey())) {
 				editor.setRole(entry.getKey(), entry.getValue().getAllow(), entry.getValue().getDeny());
@@ -306,11 +301,6 @@ public final class TicketService {
 			}
 		}
 
-		for (final long role : type.getBlacklistRoles()) {
-			if (this.exists(channel, role)) {
-				editor.denyRole(role, Permission.VIEW_CHANNEL);
-			}
-		}
 		return editor;
 	}
 

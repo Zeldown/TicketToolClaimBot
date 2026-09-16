@@ -18,7 +18,6 @@ public final class TypeConfig extends ScopeConfig {
 	private long                    staffRole;
 	private Set<Long>               ranks = new LinkedHashSet<>();
 	private Set<Long>               categories = new LinkedHashSet<>();
-	private Set<Long>               blacklistRoles = new LinkedHashSet<>();
 	private Set<Long>               supervisorRoles = new LinkedHashSet<>();
 	private Set<Long>               closeCategories = new LinkedHashSet<>();
 	private Map<String, TicketTeam> teams = new LinkedHashMap<>();
