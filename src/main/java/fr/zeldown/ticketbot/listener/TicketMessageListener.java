@@ -13,6 +13,7 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 public final class TicketMessageListener extends ListenerAdapter {
 
+	private static final int DELETE_DELAY = 2;
 	private static final int WARNING_DELAY = 10;
 
 	@Override
@@ -24,7 +25,7 @@ public final class TicketMessageListener extends ListenerAdapter {
 			return;
 		}
 
-		event.getMessage().delete().queue();
+		event.getMessage().delete().queueAfter(TicketMessageListener.DELETE_DELAY, TimeUnit.SECONDS);
 		event.getChannel().sendMessageEmbeds(TicketBot.inst().getMessages().embed(type, TicketMessage.CLAIM_REQUIRED, Placeholders.create().member("staff", member, tickets.rank(type, member)))).queue(warning -> warning.delete().queueAfter(TicketMessageListener.WARNING_DELAY, TimeUnit.SECONDS));
 	}
 
