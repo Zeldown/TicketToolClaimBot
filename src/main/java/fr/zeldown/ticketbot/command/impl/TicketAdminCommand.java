@@ -57,7 +57,7 @@ public final class TicketAdminCommand implements SlashCommand {
 	private static final String  NAME = "ticket-admin";
 	private static final Pattern ID = Pattern.compile("[a-z0-9-]{1,32}");
 	private static final Pattern COLOR = Pattern.compile("#[0-9a-fA-F]{6}");
-	private static final String  PLACEHOLDERS = "Variables : {owner} {staff} {user} {roles} {team} {reason} {emoji}";
+	private static final String  PLACEHOLDERS = "Variables : {owner} {staff} {user} {roles} {team} {reason} {emoji} {mention} {queue} {eta} {notice}";
 
 	private final Map<String, Consumer<SlashCommandInteractionEvent>> handlers = new HashMap<>();
 
@@ -67,6 +67,7 @@ public final class TicketAdminCommand implements SlashCommand {
 		this.handlers.put("status", this::status);
 		this.handlers.put("reload", this::reload);
 		this.handlers.put("stats sla", this::sla);
+		this.handlers.put("mention", this::mention);
 		this.handlers.put("message", this::message);
 		this.handlers.put("stats font", this::font);
 		this.handlers.put("stats live", this::live);
@@ -103,6 +104,7 @@ public final class TicketAdminCommand implements SlashCommand {
 				new SubcommandData("status", "Afficher la configuration globale ou d'un type").addOptions(scope),
 				new SubcommandData("reload", "Recharger les fichiers de configuration"),
 				new SubcommandData("staff", "Définir le rôle staff d'un type").addOptions(type, role),
+				new SubcommandData("mention", "Définir le rôle mentionné à l'ouverture d'un ticket").addOptions(type, role),
 				new SubcommandData("emoji", "Définir l'emoji des messages").addOption(OptionType.STRING, "emoji", "Emoji personnalisé ou identifiant", true).addOptions(scope),
 				new SubcommandData("message", "Modifier un message").addOptions(new OptionData(OptionType.STRING, "key", "Message à modifier", true).addChoices(Arrays.stream(TicketMessage.values()).map(message -> new Command.Choice(message.getKey(), message.getKey())).collect(Collectors.toList())), scope)
 				)
@@ -263,6 +265,7 @@ public final class TicketAdminCommand implements SlashCommand {
 			final TypeConfig type = (TypeConfig) scope;
 			embed
 			.addField("Rôle staff", TicketAdminCommand.fallback(type.getStaffRole() == 0L ? "" : TicketAdminCommand.mentions(Collections.singleton(type.getStaffRole()), "@&")), true)
+			.addField("Rôle mentionné", TicketAdminCommand.fallback(type.getMentionRole() == 0L ? "" : TicketAdminCommand.mentions(Collections.singleton(type.getMentionRole()), "@&")), true)
 			.addField("Catégories", TicketAdminCommand.fallback(TicketAdminCommand.mentions(type.getCategories(), "#")), false)
 			.addField("Catégories fermées", TicketAdminCommand.fallback(TicketAdminCommand.mentions(type.getCloseCategories(), "#")), false)
 			.addField("Grades", TicketAdminCommand.fallback(TicketAdminCommand.mentions(type.getRanks(), "@&")), false)
@@ -284,6 +287,18 @@ public final class TicketAdminCommand implements SlashCommand {
 
 		TicketBot.inst().refresh();
 		this.reply(event, TicketAdminCommand.SUCCESS, "La configuration a été rechargée (" + TicketBot.inst().getConfig().types().size() + " type(s)).");
+	}
+
+	private void mention(final SlashCommandInteractionEvent event) {
+		final TypeConfig type = this.type(event);
+		if (type == null) {
+			return;
+		}
+
+		final Role role = event.getOption("role", OptionMapping::getAsRole);
+		type.setMentionRole(role.getIdLong());
+		this.save();
+		this.reply(event, TicketAdminCommand.SUCCESS, "Le rôle mentionné à l'ouverture des tickets `" + type.getId() + "` est désormais " + role.getAsMention() + ".");
 	}
 
 	private void message(final SlashCommandInteractionEvent event) {

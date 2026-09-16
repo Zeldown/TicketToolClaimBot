@@ -7,7 +7,7 @@ import lombok.NonNull;
 @Getter
 public enum TicketMessage {
 
-	WAITING("waiting", "", "#F1C40F", "Ticket en attente de prise en charge", "{emoji} Merci d'avoir ouvert un ticket !\n\nVotre demande est actuellement **en attente d'assignation**, un membre du staff va la prendre en charge très prochainement.\n\n{queue} {eta}\n\nDès que ce sera fait, vous pourrez **expliquer votre problème** directement dans ce salon. Merci de votre patience !\n\n{notice}"),
+	WAITING("waiting", "{mention}", "#F1C40F", "Ticket en attente de prise en charge", "{emoji} Merci d'avoir ouvert un ticket !\n\nVotre demande est actuellement **en attente d'assignation**, un membre du staff va la prendre en charge très prochainement.\n\n{queue} {eta}\n\nDès que ce sera fait, vous pourrez **expliquer votre problème** directement dans ce salon. Merci de votre patience !\n\n{notice}"),
 	CLAIM("claim", "{owner}", "#2ECC71", "Ticket pris en charge", "{staff} prend désormais en charge votre ticket.\n\nVous pouvez dès à présent **expliquer votre problème** en détail dans ce salon, votre demande sera traitée dans les meilleurs délais."),
 	ADD("add", "{user}", "#3498DB", "Membre ajouté", "{staff} a ajouté {user} au ticket.\n\n{user} peut désormais consulter ce salon et participer à la discussion."),
 	REMOVE("remove", "", "#E67E22", "Membre retiré", "{staff} a retiré {user} du ticket.\n\n{user} n'a plus accès à ce salon."),

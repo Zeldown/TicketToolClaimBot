@@ -150,7 +150,11 @@ public final class TicketService {
 		}
 
 		final long delay = TicketQueue.delay(this.stats, type);
-		final Placeholders placeholders = Placeholders.create().text("queue", TicketQueue.queue(this.position(type, channel))).text("eta", TicketQueue.eta(delay)).text("notice", TicketQueue.notice(delay));
+		final Placeholders placeholders = Placeholders.create().text("queue", TicketQueue.queue(this.position(type, channel))).text("eta", TicketQueue.eta(delay)).text("notice", TicketQueue.notice(delay)).text("mention", "");
+		if (type.getMentionRole() != 0L) {
+			placeholders.roles("mention", Collections.singleton(type.getMentionRole()));
+		}
+
 		return this.apply(editor).thenCompose(result -> {
 			this.stats.log(StatsEvent.create(StatsEvent.OPEN, type, channel).owner(owner));
 			return channel.getJDA().retrieveUserById(owner).submit();

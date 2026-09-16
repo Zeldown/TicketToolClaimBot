@@ -16,6 +16,7 @@ public final class TypeConfig extends ScopeConfig {
 	private transient String id;
 
 	private long                    staffRole;
+	private long                    mentionRole;
 	private Set<Long>               ranks = new LinkedHashSet<>();
 	private Set<Long>               categories = new LinkedHashSet<>();
 	private Set<Long>               supervisorRoles = new LinkedHashSet<>();
