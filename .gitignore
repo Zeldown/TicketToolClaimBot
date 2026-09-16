@@ -3,7 +3,8 @@ build/
 bin/
 logs/
 .claude/
-config/
+/config/
+/stats/
 
 ## Eclipse
 .project
