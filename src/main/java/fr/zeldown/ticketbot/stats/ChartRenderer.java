@@ -45,7 +45,7 @@ public final class ChartRenderer {
 		return canvas.text("plus", end + 10, ChartTheme.HEIGHT - 26, font, ChartTheme.MUTED).export();
 	}
 
-	public static byte[] ranking(final @NonNull String title, final String subtitle, final @NonNull List<ChartKpi> kpis, final @NonNull List<String> labels, final long[] values) {
+	public static byte[] bars(final @NonNull String title, final String subtitle, final @NonNull List<ChartKpi> kpis, final @NonNull List<String> labels, final long[] values) {
 		final ChartCanvas canvas = ChartCanvas.create(title, subtitle).kpis(kpis);
 		final long max = Math.max(1L, ChartRenderer.max(values));
 		final int start = kpis.isEmpty() ? 110 : 214;
@@ -56,9 +56,7 @@ public final class ChartRenderer {
 		for (int index = 0; index < values.length; index++) {
 			final int y = top + index * slot;
 			final int width = (int) (values[index] * (ChartTheme.WIDTH - left - ChartTheme.PADDING - 60) / max);
-			canvas.circle(ChartTheme.PADDING, y + slot / 2 - 22, 22, ChartTheme.SURFACE);
-			canvas.text(Integer.toString(index + 1), ChartTheme.PADDING + (index < 9 ? 8 : 4), y + slot / 2 - 6, ChartTheme.bold(12F), ChartTheme.MUTED);
-			canvas.text(ChartRenderer.cut(canvas, labels.get(index), left - 78), ChartTheme.PADDING + 32, y + slot / 2 - 5, ChartTheme.regular(14F), ChartTheme.TEXT);
+			canvas.text(ChartRenderer.cut(canvas, labels.get(index), left - ChartTheme.PADDING - 16), ChartTheme.PADDING, y + slot / 2 - 5, ChartTheme.regular(14F), ChartTheme.TEXT);
 			canvas.rounded(left, y + slot / 2 - 19, ChartTheme.WIDTH - left - ChartTheme.PADDING - 60, 18, 9, ChartTheme.SURFACE);
 			canvas.rounded(left, y + slot / 2 - 19, width, 18, 9, new GradientPaint(left, 0F, ChartTheme.PRIMARY, left + Math.max(1, width), 0F, ChartTheme.ACCENT));
 			canvas.text(Long.toString(values[index]), ChartTheme.WIDTH - ChartTheme.PADDING - 48, y + slot / 2 - 5, ChartTheme.bold(14F), ChartTheme.TEXT);

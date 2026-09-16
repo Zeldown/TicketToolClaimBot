@@ -117,7 +117,7 @@ public final class TicketStatsCommand implements SlashCommand {
 
 		final List<ChartKpi> kpis = Arrays.asList(ChartKpi.of("Médiane", StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.5D))), ChartKpi.of("p90", StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.9D))), ChartKpi.of("p99", StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.99D))), ChartKpi.of("Jamais pris", Long.toString(records.stream().filter(record -> !record.isOpen() && record.getClaim() == 0L).count())), ChartKpi.of("Transferts 3+", Long.toString(records.stream().filter(record -> record.getTransfers() >= 3).count())));
 		embed.setDescription("Délais de prise en charge mesurés sur **" + waits.length + "** tickets.");
-		return ChartRenderer.ranking("Répartition des délais de prise en charge", subtitle, kpis, Arrays.asList("moins d'1 min", "1 à 5 min", "5 à 15 min", "15 à 60 min", "plus d'1 h"), buckets);
+		return ChartRenderer.bars("Répartition des délais de prise en charge", subtitle, kpis, Arrays.asList("moins d'1 min", "1 à 5 min", "5 à 15 min", "15 à 60 min", "plus d'1 h"), buckets);
 	}
 
 	private @NonNull List<ActionRow> rows(final @NonNull StatsPeriod period, final @NonNull StatsView view, final long staff, final @NonNull String type) {
