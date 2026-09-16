@@ -123,9 +123,9 @@ public final class StatsLive {
 		for (int index = 0; index < top.size(); index++) {
 			final long id = top.get(index);
 			final List<TicketRecord> handled = records.stream().filter(record -> record.getStaff() == id).collect(Collectors.toList());
-			final long[] waits = handled.stream().filter(record -> record.getOpen() >= window).mapToLong(TicketRecord::waitMs).filter(wait -> wait > 0L).sorted().toArray();
+			final long[] waits = TicketRecord.waits(handled.stream().filter(record -> record.getOpen() >= window).collect(Collectors.toList()));
 			final User user = index < users.size() ? users.get(index) : null;
-			rows.add(new String[] { user == null ? "Inconnu" : user.getEffectiveName(), Long.toString(handled.stream().filter(TicketRecord::isOpen).count()), Long.toString(handled.stream().filter(record -> record.getOpen() >= window).count()), waits.length == 0 ? "—" : StatsFormat.duration(waits[waits.length / 2]) });
+			rows.add(new String[] { user == null ? "Inconnu" : user.getEffectiveName(), Long.toString(handled.stream().filter(TicketRecord::isOpen).count()), Long.toString(handled.stream().filter(record -> record.getOpen() >= window).count()), StatsFormat.duration(TicketRecord.quantile(waits, 0.5D)) });
 		}
 
 		final List<ChartKpi> kpis = Arrays.asList(ChartKpi.of("Ouverts", Long.toString(open)), ChartKpi.of("En attente", Long.toString(waiting)), ChartKpi.of("Pris en charge", Long.toString(open - waiting)), ChartKpi.of("Plus ancienne attente", oldest == 0L ? "—" : StatsFormat.duration(System.currentTimeMillis() - oldest)));

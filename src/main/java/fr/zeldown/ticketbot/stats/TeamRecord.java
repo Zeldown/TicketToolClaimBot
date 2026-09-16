@@ -66,12 +66,7 @@ public final class TeamRecord {
 	}
 
 	private static long median(final @NonNull List<Long> values) {
-		if (values.isEmpty()) {
-			return 0L;
-		}
-
-		final List<Long> sorted = values.stream().sorted().collect(Collectors.toList());
-		return sorted.get(sorted.size() / 2);
+		return TicketRecord.quantile(values.stream().mapToLong(Long::longValue).sorted().toArray(), 0.5D);
 	}
 
 }

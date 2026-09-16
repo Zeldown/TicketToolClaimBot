@@ -1,6 +1,7 @@
 package fr.zeldown.ticketbot.ticket;
 
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import fr.zeldown.ticketbot.config.TypeConfig;
 import fr.zeldown.ticketbot.stats.StatsService;
@@ -32,12 +33,12 @@ public final class TicketQueue {
 	}
 
 	public static long delay(final @NonNull StatsService stats, final @NonNull TypeConfig type) {
-		final long[] waits = stats.records(System.currentTimeMillis() - TicketQueue.WINDOW).stream().filter(record -> type.getId().equals(record.getType())).mapToLong(TicketRecord::waitMs).filter(wait -> wait > 0L).sorted().toArray();
+		final long[] waits = TicketRecord.waits(stats.records(System.currentTimeMillis() - TicketQueue.WINDOW).stream().filter(record -> type.getId().equals(record.getType())).collect(Collectors.toList()));
 		if (waits.length < TicketQueue.SAMPLE) {
 			return 0L;
 		}
 
-		final long median = waits[waits.length / 2];
+		final long median = TicketRecord.quantile(waits, 0.5D);
 		return median > TicketQueue.CEILING ? 0L : median;
 	}
 

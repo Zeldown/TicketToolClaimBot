@@ -115,7 +115,7 @@ public final class TicketStatsCommand implements SlashCommand {
 			buckets[minutes < 1L ? 0 : minutes < 5L ? 1 : minutes < 15L ? 2 : minutes < 60L ? 3 : 4]++;
 		}
 
-		final List<ChartKpi> kpis = Arrays.asList(ChartKpi.of("Médiane", StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.5D))), ChartKpi.of("p90", StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.9D))), ChartKpi.of("p99", StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.99D))), ChartKpi.of("Jamais pris", Long.toString(records.stream().filter(record -> !record.isOpen() && record.getClaim() == 0L).count())), ChartKpi.of("Transferts 3+", Long.toString(records.stream().filter(record -> record.getTransfers() >= 3).count())));
+		final List<ChartKpi> kpis = Arrays.asList(ChartKpi.of("Médiane", StatsFormat.duration(TicketRecord.quantile(waits, 0.5D))), ChartKpi.of("p90", StatsFormat.duration(TicketRecord.quantile(waits, 0.9D))), ChartKpi.of("p99", StatsFormat.duration(TicketRecord.quantile(waits, 0.99D))), ChartKpi.of("Jamais pris", Long.toString(records.stream().filter(record -> !record.isOpen() && record.getClaim() == 0L).count())), ChartKpi.of("Transferts 3+", Long.toString(records.stream().filter(record -> record.getTransfers() >= 3).count())));
 		embed.setDescription("Délais de prise en charge mesurés sur **" + waits.length + "** tickets.");
 		return ChartRenderer.bars("Répartition des délais de prise en charge", subtitle, kpis, Arrays.asList("moins d'1 min", "1 à 5 min", "5 à 15 min", "15 à 60 min", "plus d'1 h"), buckets);
 	}
@@ -201,23 +201,19 @@ public final class TicketStatsCommand implements SlashCommand {
 
 	private byte[] overview(final @NonNull EmbedBuilder embed, final @NonNull String subtitle, final @NonNull StatsPeriod period, final long staff, final @NonNull String type, final @NonNull List<TicketRecord> records) {
 		final long closed = records.stream().filter(record -> !record.isOpen()).count();
-		final long[] waits = records.stream().mapToLong(TicketRecord::waitMs).filter(wait -> wait > 0L).sorted().toArray();
+		final long[] waits = TicketRecord.waits(records);
 		final long sla = TicketBot.inst().getConfig().global().getStats().getSla() * 60000L;
 		final long within = Arrays.stream(waits).filter(wait -> wait <= sla).count();
-		final long[] handled = records.stream().mapToLong(TicketRecord::handleMs).filter(handle -> handle > 0L).sorted().toArray();
+		final long[] handled = TicketRecord.handles(records);
 		embed.setDescription("**" + records.size() + "** tickets ouverts sur la période, dont `" + (records.size() - closed) + "` encore en cours.");
 		embed.addField("Tickets", "Ouverts `" + records.size() + "`\nFermés `" + closed + "`\nEn cours `" + (records.size() - closed) + "`", true);
-		embed.addField("Prise en charge", "Médiane `" + StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.5D)) + "`\np90 `" + StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.9D)) + "`\nSLA `" + TicketStatsCommand.percent(within, waits.length) + "`", true);
-		embed.addField("Qualité", "Transférés `" + TicketStatsCommand.percent(records.stream().filter(record -> record.getTransfers() > 0).count(), records.size()) + "`\nJamais pris `" + TicketStatsCommand.percent(records.stream().filter(record -> !record.isOpen() && record.getClaim() == 0L).count(), records.size()) + "`\nTraitement `" + StatsFormat.duration(TicketStatsCommand.quantile(handled, 0.5D)) + "`", true);
+		embed.addField("Prise en charge", "Médiane `" + StatsFormat.duration(TicketRecord.quantile(waits, 0.5D)) + "`\np90 `" + StatsFormat.duration(TicketRecord.quantile(waits, 0.9D)) + "`\nSLA `" + TicketStatsCommand.percent(within, waits.length) + "`", true);
+		embed.addField("Qualité", "Transférés `" + TicketStatsCommand.percent(records.stream().filter(record -> record.getTransfers() > 0).count(), records.size()) + "`\nJamais pris `" + TicketStatsCommand.percent(records.stream().filter(record -> !record.isOpen() && record.getClaim() == 0L).count(), records.size()) + "`\nTraitement `" + StatsFormat.duration(TicketRecord.quantile(handled, 0.5D)) + "`", true);
 
-		final int days = Math.min(90, period.getDays() == 0 ? 90 : period.getDays());
-		final List<String> labels = new ArrayList<>();
+		final int days = TicketStatsCommand.days(period);
+		final List<String> labels = TicketStatsCommand.labels(days);
 		final long[] opened = new long[days];
 		final long[] finished = new long[days];
-		for (int index = 0; index < days; index++) {
-			labels.add(LocalDate.now().minusDays(days - 1L - index).format(TicketStatsCommand.LABEL));
-		}
-
 		for (final TicketRecord record : records) {
 			TicketStatsCommand.count(opened, days, record.getOpen());
 			TicketStatsCommand.count(finished, days, record.getClose() == 0L ? record.getDelete() : record.getClose());
@@ -225,7 +221,7 @@ public final class TicketStatsCommand implements SlashCommand {
 
 		final long before = TicketStatsCommand.before(period, staff, type);
 		final long change = before == 0L ? 0L : Math.round((records.size() - before) * 100D / before);
-		final List<ChartKpi> kpis = Arrays.asList(new ChartKpi("Tickets ouverts", Long.toString(records.size()), before == 0L ? null : (change > 0L ? "+" : "") + change + " %", change <= 0L), ChartKpi.of("En cours", Long.toString(records.size() - closed)), ChartKpi.of("Prise en charge", StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.5D))), ChartKpi.of("Objectif " + TicketStatsCommand.objective(TicketBot.inst().getConfig().global().getStats().getSla()), TicketStatsCommand.percent(within, waits.length)));
+		final List<ChartKpi> kpis = Arrays.asList(new ChartKpi("Tickets ouverts", Long.toString(records.size()), before == 0L ? null : (change > 0L ? "+" : "") + change + " %", change <= 0L), ChartKpi.of("En cours", Long.toString(records.size() - closed)), ChartKpi.of("Prise en charge", StatsFormat.duration(TicketRecord.quantile(waits, 0.5D))), ChartKpi.of("Objectif " + TicketStatsCommand.objective(TicketBot.inst().getConfig().global().getStats().getSla()), TicketStatsCommand.percent(within, waits.length)));
 		return ChartRenderer.trend("Tickets ouverts et fermés par jour", subtitle, kpis, labels, opened, finished, "Ouverts", "Fermés");
 	}
 
@@ -239,16 +235,16 @@ public final class TicketStatsCommand implements SlashCommand {
 
 		final List<Map.Entry<Long, List<TicketRecord>>> sorted = claimed.entrySet().stream().sorted((first, second) -> Integer.compare(second.getValue().size(), first.getValue().size())).limit(TicketStatsCommand.TOP).collect(Collectors.toList());
 		final List<RestAction<User>> requests = sorted.stream().map(entry -> TicketBot.inst().getJda().retrieveUserById(entry.getKey()).onErrorMap(error -> null)).collect(Collectors.toList());
-		final long[] overall = records.stream().mapToLong(TicketRecord::waitMs).filter(wait -> wait > 0L).sorted().toArray();
+		final long[] overall = TicketRecord.waits(records);
 		final long handled = records.stream().filter(record -> record.getStaff() != 0L).count();
 		final long running = records.stream().filter(record -> record.getStaff() != 0L && record.isOpen()).count();
-		final List<ChartKpi> kpis = Arrays.asList(ChartKpi.of("Staff actifs", Integer.toString(claimed.size())), ChartKpi.of("Prises en charge", Long.toString(handled)), ChartKpi.of("Médiane", StatsFormat.duration(TicketStatsCommand.quantile(overall, 0.5D))), ChartKpi.of("En cours", Long.toString(running)));
+		final List<ChartKpi> kpis = Arrays.asList(ChartKpi.of("Staff actifs", Integer.toString(claimed.size())), ChartKpi.of("Prises en charge", Long.toString(handled)), ChartKpi.of("Médiane", StatsFormat.duration(TicketRecord.quantile(overall, 0.5D))), ChartKpi.of("En cours", Long.toString(running)));
 		RestAction.allOf(requests).queue(users -> {
 			final List<String[]> lines = new ArrayList<>();
 			for (int index = 0; index < sorted.size(); index++) {
 				final List<TicketRecord> tickets = sorted.get(index).getValue();
-				final long[] waits = tickets.stream().mapToLong(TicketRecord::waitMs).filter(wait -> wait > 0L).sorted().toArray();
-				lines.add(new String[] { users.get(index) == null ? "Inconnu" : users.get(index).getEffectiveName(), Integer.toString(tickets.size()), StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.5D)), StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.9D)), Long.toString(tickets.stream().filter(TicketRecord::isOpen).count()) });
+				final long[] waits = TicketRecord.waits(tickets);
+				lines.add(new String[] { users.get(index) == null ? "Inconnu" : users.get(index).getEffectiveName(), Integer.toString(tickets.size()), StatsFormat.duration(TicketRecord.quantile(waits, 0.5D)), StatsFormat.duration(TicketRecord.quantile(waits, 0.9D)), Long.toString(tickets.stream().filter(TicketRecord::isOpen).count()) });
 			}
 
 			embed.setDescription("**" + handled + "** prises en charge par `" + claimed.size() + "` membres du staff sur la période.");
@@ -259,23 +255,19 @@ public final class TicketStatsCommand implements SlashCommand {
 	private void profile(final @NonNull InteractionHook hook, final @NonNull EmbedBuilder embed, final @NonNull StatsPeriod period, final long staff, final @NonNull String type, final @NonNull List<TicketRecord> records) {
 		final long since = period.since();
 		final List<StatsEvent> events = TicketBot.inst().getStats().events(since).stream().filter(event -> event.getStaff() == staff && (TicketStatsCommand.ALL.equals(type) || type.equals(event.getType()))).collect(Collectors.toList());
-		final long[] waits = records.stream().mapToLong(TicketRecord::waitMs).filter(wait -> wait > 0L).sorted().toArray();
-		final long[] handled = records.stream().mapToLong(TicketRecord::handleMs).filter(handle -> handle > 0L).sorted().toArray();
+		final long[] waits = TicketRecord.waits(records);
+		final long[] handled = TicketRecord.handles(records);
 		final long closed = records.stream().filter(record -> !record.isOpen()).count();
 		final long claims = TicketStatsCommand.total(events, StatsEvent.CLAIM);
 		embed.setDescription("<@" + staff + "> — `" + claims + "` prises en charge sur la période, dont `" + (records.size() - closed) + "` encore en cours.");
-		embed.addField("Délais", "Médiane `" + StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.5D)) + "`\np90 `" + StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.9D)) + "`\nTraitement `" + StatsFormat.duration(TicketStatsCommand.quantile(handled, 0.5D)) + "`", true);
+		embed.addField("Délais", "Médiane `" + StatsFormat.duration(TicketRecord.quantile(waits, 0.5D)) + "`\np90 `" + StatsFormat.duration(TicketRecord.quantile(waits, 0.9D)) + "`\nTraitement `" + StatsFormat.duration(TicketRecord.quantile(handled, 0.5D)) + "`", true);
 		embed.addField("Actions", "Transferts `" + TicketStatsCommand.total(events, StatsEvent.TRANSFER) + "`\nAjouts `" + TicketStatsCommand.total(events, StatsEvent.ADD) + "`\nRetraits `" + TicketStatsCommand.total(events, StatsEvent.REMOVE) + "`", true);
 		embed.addField("Tickets", "Pris en charge `" + records.size() + "`\nFermés `" + closed + "`\nRe-transférés `" + records.stream().filter(record -> record.getTransfers() > 0).count() + "`", true);
 
-		final int days = Math.min(90, period.getDays() == 0 ? 90 : period.getDays());
-		final List<String> labels = new ArrayList<>();
+		final int days = TicketStatsCommand.days(period);
+		final List<String> labels = TicketStatsCommand.labels(days);
 		final long[] taken = new long[days];
 		final long[] finished = new long[days];
-		for (int index = 0; index < days; index++) {
-			labels.add(LocalDate.now().minusDays(days - 1L - index).format(TicketStatsCommand.LABEL));
-		}
-
 		for (final StatsEvent event : events) {
 			if (StatsEvent.CLAIM.equals(event.getEvent())) {
 				TicketStatsCommand.count(taken, days, event.getTime());
@@ -287,7 +279,7 @@ public final class TicketStatsCommand implements SlashCommand {
 		}
 
 		TicketBot.inst().getJda().retrieveUserById(staff).onErrorMap(error -> null).queue(user -> {
-			final List<ChartKpi> kpis = Arrays.asList(ChartKpi.of("Pris en charge", Long.toString(claims)), ChartKpi.of("Médiane", StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.5D))), ChartKpi.of("p90", StatsFormat.duration(TicketStatsCommand.quantile(waits, 0.9D))), ChartKpi.of("Traitement", StatsFormat.duration(TicketStatsCommand.quantile(handled, 0.5D))));
+			final List<ChartKpi> kpis = Arrays.asList(ChartKpi.of("Pris en charge", Long.toString(claims)), ChartKpi.of("Médiane", StatsFormat.duration(TicketRecord.quantile(waits, 0.5D))), ChartKpi.of("p90", StatsFormat.duration(TicketRecord.quantile(waits, 0.9D))), ChartKpi.of("Traitement", StatsFormat.duration(TicketRecord.quantile(handled, 0.5D))));
 			final String title = "Activité de " + (user == null ? "ce staff" : user.getEffectiveName());
 			this.publish(hook, embed, ChartRenderer.trend(title, TicketStatsCommand.subtitle(period, type), kpis, labels, taken, finished, "Pris en charge", "Fermés"), period, StatsView.PROFILE, staff, type);
 		});
@@ -302,15 +294,23 @@ public final class TicketStatsCommand implements SlashCommand {
 		hook.editOriginalEmbeds(embed.setImage("attachment://" + TicketStatsCommand.CHART).build()).setAttachments(FileUpload.fromData(chart, TicketStatsCommand.CHART)).setComponents(this.rows(period, view, staff, type)).queue();
 	}
 
+	private static int days(final @NonNull StatsPeriod period) {
+		return Math.min(90, period.getDays() == 0 ? 90 : period.getDays());
+	}
+
+	private static @NonNull List<String> labels(final int days) {
+		final List<String> labels = new ArrayList<>();
+		for (int index = 0; index < days; index++) {
+			labels.add(LocalDate.now().minusDays(days - 1L - index).format(TicketStatsCommand.LABEL));
+		}
+		return labels;
+	}
+
 	private static @NonNull String objective(final int minutes) {
 		if (minutes < 60) {
 			return minutes + " min";
 		}
 		return minutes % 60 == 0 ? minutes / 60 + " h" : minutes / 60 + " h " + minutes % 60;
-	}
-
-	private static long quantile(final long[] values, final double ratio) {
-		return values.length == 0 ? 0L : values[(int) Math.min(values.length - 1L, Math.round(ratio * (values.length - 1)))];
 	}
 
 	private static @NonNull String percent(final long part, final long total) {

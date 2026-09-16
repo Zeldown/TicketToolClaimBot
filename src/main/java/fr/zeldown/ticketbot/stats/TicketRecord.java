@@ -1,5 +1,7 @@
 package fr.zeldown.ticketbot.stats;
 
+import java.util.List;
+
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +59,18 @@ public final class TicketRecord {
 		} else if (StatsEvent.DELETE.equals(event.getEvent())) {
 			this.delete = event.getTime();
 		}
+	}
+
+	public static long quantile(final long[] values, final double ratio) {
+		return values.length == 0 ? 0L : values[(int) Math.min(values.length - 1L, Math.round(ratio * (values.length - 1)))];
+	}
+
+	public static long[] waits(final @NonNull List<TicketRecord> records) {
+		return records.stream().mapToLong(TicketRecord::waitMs).filter(wait -> wait > 0L).sorted().toArray();
+	}
+
+	public static long[] handles(final @NonNull List<TicketRecord> records) {
+		return records.stream().mapToLong(TicketRecord::handleMs).filter(handle -> handle > 0L).sorted().toArray();
 	}
 
 }
