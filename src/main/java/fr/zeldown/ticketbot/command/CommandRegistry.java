@@ -10,6 +10,8 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 @Slf4j
@@ -36,10 +38,26 @@ public final class CommandRegistry extends ListenerAdapter {
 	}
 
 	@Override
+	public void onButtonInteraction(final ButtonInteractionEvent event) {
+		final SlashCommand command = this.commands.get(event.getComponentId().split(":", 2)[0]);
+		if (command != null) {
+			command.button(event);
+		}
+	}
+
+	@Override
 	public void onSlashCommandInteraction(final SlashCommandInteractionEvent event) {
 		final SlashCommand command = this.commands.get(event.getName());
 		if (command != null) {
 			command.execute(event);
+		}
+	}
+
+	@Override
+	public void onStringSelectInteraction(final StringSelectInteractionEvent event) {
+		final SlashCommand command = this.commands.get(event.getComponentId().split(":", 2)[0]);
+		if (command != null) {
+			command.select(event);
 		}
 	}
 

@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import fr.zeldown.ticketbot.TicketBot;
 import fr.zeldown.ticketbot.config.TypeConfig;
+import fr.zeldown.ticketbot.stats.StatsEvent;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.channel.ChannelCreateEvent;
@@ -30,6 +31,10 @@ public final class TicketOpenListener extends ListenerAdapter {
 
 	@Override
 	public void onChannelDelete(final ChannelDeleteEvent event) {
+		final TypeConfig type = TicketBot.inst().getTickets().type(event.getChannel());
+		if (type != null) {
+			TicketBot.inst().getStats().log(StatsEvent.create(StatsEvent.DELETE, type, event.getChannel().asTextChannel()));
+		}
 		this.pending.remove(event.getChannel().getIdLong());
 	}
 

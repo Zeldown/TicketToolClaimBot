@@ -16,6 +16,8 @@ import fr.zeldown.ticketbot.config.TypeConfig;
 import fr.zeldown.ticketbot.message.MessageService;
 import fr.zeldown.ticketbot.message.Placeholders;
 import fr.zeldown.ticketbot.message.TicketMessage;
+import fr.zeldown.ticketbot.stats.StatsEvent;
+import fr.zeldown.ticketbot.stats.StatsService;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import net.dv8tion.jda.api.Permission;
@@ -37,6 +39,7 @@ public final class TicketService {
 	private static final int          HISTORY = 100;
 	private static final Permission[] ACCESS = { Permission.VIEW_CHANNEL, Permission.MESSAGE_SEND, Permission.MESSAGE_HISTORY, Permission.MESSAGE_ATTACH_FILES, Permission.MESSAGE_EMBED_LINKS };
 
+	private final StatsService                             stats;
 	private final ConfigService                            config;
 	private final MessageService                           messages;
 	private final Set<Long>                                locks = ConcurrentHashMap.newKeySet();
@@ -131,7 +134,10 @@ public final class TicketService {
 
 		final PermissionEditor editor = this.hide(ticket, Collections.emptySet());
 		editor.grantMember(ticket.getOwner().getIdLong(), Permission.MESSAGE_SEND).grantMember(staff.getIdLong(), TicketService.ACCESS);
-		return this.apply(editor).thenCompose(result -> this.messages.announce(ticket, TicketMessage.CLAIM, this.placeholders(ticket, staff)));
+		return this.apply(editor).thenCompose(result -> {
+			this.stats.log(this.event(StatsEvent.CLAIM, ticket).staff(staff.getIdLong()));
+			return this.messages.announce(ticket, TicketMessage.CLAIM, this.placeholders(ticket, staff));
+		});
 	}
 
 	public @NonNull CompletableFuture<Ticket> resolve(final @NonNull TypeConfig type, final @NonNull TextChannel channel) {
@@ -146,7 +152,13 @@ public final class TicketService {
 		if (this.exists(channel, type.getStaffRole())) {
 			editor.grantRole(type.getStaffRole(), TicketService.ACCESS);
 		}
-		return this.apply(editor).thenCompose(result -> channel.getJDA().retrieveUserById(owner).submit()).thenCompose(user -> this.messages.announce(new Ticket(user, type, channel), TicketMessage.WAITING, Placeholders.create()));
+
+		final long delay = TicketQueue.delay(this.stats, type);
+		final Placeholders placeholders = Placeholders.create().text("queue", TicketQueue.queue(this.position(type, channel))).text("eta", TicketQueue.eta(delay)).text("notice", TicketQueue.notice(delay));
+		return this.apply(editor).thenCompose(result -> {
+			this.stats.log(StatsEvent.create(StatsEvent.OPEN, type, channel).owner(owner));
+			return channel.getJDA().retrieveUserById(owner).submit();
+		}).thenCompose(user -> this.messages.announce(new Ticket(user, type, channel), TicketMessage.WAITING, placeholders));
 	}
 
 	public @NonNull CompletableFuture<Message> add(final @NonNull Ticket ticket, final @NonNull Member staff, final @NonNull Member target) {
@@ -159,7 +171,10 @@ public final class TicketService {
 			throw new TicketException(TicketMessage.ALREADY_ADDED, placeholders);
 		}
 
-		return this.apply(PermissionEditor.of(ticket.getChannel()).grantMember(target.getIdLong(), TicketService.ACCESS)).thenCompose(result -> this.messages.announce(ticket, TicketMessage.ADD, placeholders));
+		return this.apply(PermissionEditor.of(ticket.getChannel()).grantMember(target.getIdLong(), TicketService.ACCESS)).thenCompose(result -> {
+			this.stats.log(this.event(StatsEvent.ADD, ticket).staff(staff.getIdLong()));
+			return this.messages.announce(ticket, TicketMessage.ADD, placeholders);
+		});
 	}
 
 	public @NonNull CompletableFuture<Message> remove(final @NonNull Ticket ticket, final @NonNull Member staff, final @NonNull Member target) {
@@ -176,7 +191,10 @@ public final class TicketService {
 			throw new TicketException(TicketMessage.NOT_ADDED, placeholders);
 		}
 
-		return this.apply(PermissionEditor.of(ticket.getChannel()).remove(target.getIdLong())).thenCompose(result -> this.messages.announce(ticket, TicketMessage.REMOVE, placeholders));
+		return this.apply(PermissionEditor.of(ticket.getChannel()).remove(target.getIdLong())).thenCompose(result -> {
+			this.stats.log(this.event(StatsEvent.REMOVE, ticket).staff(staff.getIdLong()));
+			return this.messages.announce(ticket, TicketMessage.REMOVE, placeholders);
+		});
 	}
 
 	public @NonNull CompletableFuture<Message> transfer(final @NonNull Ticket ticket, final @NonNull Member staff, final @NonNull String id, final @NonNull String reason) {
@@ -199,7 +217,10 @@ public final class TicketService {
 				editor.grantRole(role, TicketService.ACCESS);
 			}
 			return this.apply(editor);
-		}).thenCompose(result -> this.messages.announce(ticket, TicketMessage.TRANSFER, this.placeholders(ticket, staff).text("team", team.getName()).text("reason", reason).roles("roles", roles)));
+		}).thenCompose(result -> {
+			this.stats.log(this.event(StatsEvent.TRANSFER, ticket).staff(staff.getIdLong()).team(id).reason(reason));
+			return this.messages.announce(ticket, TicketMessage.TRANSFER, this.placeholders(ticket, staff).text("team", team.getName()).text("reason", reason).roles("roles", roles));
+		});
 	}
 
 	public @NonNull CompletableFuture<Void> reconcile(final @NonNull TypeConfig type, final @NonNull TextChannel channel, final @NonNull Map<Long, PermissionSnapshot> previous) {
@@ -211,6 +232,10 @@ public final class TicketService {
 			if (entry.getValue().isRole() && roles.contains(entry.getKey())) {
 				editor.setRole(entry.getKey(), entry.getValue().getAllow(), entry.getValue().getDeny());
 			}
+		}
+
+		if (this.closed(channel, previous, members)) {
+			this.stats.log(StatsEvent.create(StatsEvent.CLOSE, type, channel));
 		}
 
 		if (members.isEmpty()) {
@@ -229,6 +254,20 @@ public final class TicketService {
 		return channel.getGuild().getRoleById(role) != null;
 	}
 
+	private @NonNull StatsEvent event(final @NonNull String event, final @NonNull Ticket ticket) {
+		return StatsEvent.create(event, ticket.getType(), ticket.getChannel()).owner(ticket.getOwner().getIdLong());
+	}
+
+	private boolean closed(final @NonNull TextChannel channel, final @NonNull Map<Long, PermissionSnapshot> previous, final @NonNull List<Long> members) {
+		for (final long member : members) {
+			final PermissionOverride override = PermissionEditor.find(channel, member);
+			if ((previous.get(member).getAllow() & Permission.VIEW_CHANNEL.getRawValue()) != 0L && override != null && !override.getAllowed().contains(Permission.VIEW_CHANNEL)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private Role find(final @NonNull Member member, final @NonNull Set<Long> roles) {
 		for (final Role role : member.getRoles()) {
 			if (roles.contains(role.getIdLong())) {
@@ -241,6 +280,10 @@ public final class TicketService {
 	private @NonNull CompletableFuture<Void> apply(final @NonNull PermissionEditor editor) {
 		this.expected.computeIfAbsent(editor.getChannel().getIdLong(), id -> new ConcurrentHashMap<>()).putAll(editor.getChanges());
 		return editor.submit();
+	}
+
+	private long position(final @NonNull TypeConfig type, final @NonNull TextChannel channel) {
+		return channel.getGuild().getTextChannels().stream().filter(other -> other.getIdLong() < channel.getIdLong() && type.getCategories().contains(other.getParentCategoryIdLong()) && this.isWaiting(other)).count();
 	}
 
 	private @NonNull PermissionEditor hide(final @NonNull Ticket ticket, final @NonNull Set<Long> kept) {

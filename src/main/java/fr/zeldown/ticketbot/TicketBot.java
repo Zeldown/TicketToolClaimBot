@@ -8,12 +8,16 @@ import fr.zeldown.ticketbot.command.impl.TicketAddCommand;
 import fr.zeldown.ticketbot.command.impl.TicketAdminCommand;
 import fr.zeldown.ticketbot.command.impl.TicketClaimCommand;
 import fr.zeldown.ticketbot.command.impl.TicketRemoveCommand;
+import fr.zeldown.ticketbot.command.impl.TicketStatsCommand;
 import fr.zeldown.ticketbot.command.impl.TicketTransferCommand;
 import fr.zeldown.ticketbot.config.ConfigService;
 import fr.zeldown.ticketbot.listener.TicketMessageListener;
 import fr.zeldown.ticketbot.listener.TicketOpenListener;
 import fr.zeldown.ticketbot.listener.TicketPermissionListener;
 import fr.zeldown.ticketbot.message.MessageService;
+import fr.zeldown.ticketbot.stats.ChartTheme;
+import fr.zeldown.ticketbot.stats.StatsLive;
+import fr.zeldown.ticketbot.stats.StatsService;
 import fr.zeldown.ticketbot.ticket.TicketService;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -34,6 +38,8 @@ public final class TicketBot {
 	private static final TicketBot INSTANCE = new TicketBot();
 
 	private JDA             jda;
+	private StatsLive       live;
+	private StatsService    stats;
 	private ConfigService   config;
 	private TicketService   tickets;
 	private MessageService  messages;
@@ -45,6 +51,7 @@ public final class TicketBot {
 
 	public void shutdown() {
 		log.info("Stopping TicketBot...");
+		this.live.shutdown();
 		this.jda.shutdown();
 	}
 
@@ -61,10 +68,13 @@ public final class TicketBot {
 			return false;
 		}
 
+		this.stats = new StatsService(this.config);
+		ChartTheme.load(this.config.global().getStats().getFont(), this.config.global().getStats().getFontBold());
 		this.messages = new MessageService();
-		this.tickets = new TicketService(this.config, this.messages);
+		this.tickets = new TicketService(this.stats, this.config, this.messages);
+		this.live = new StatsLive(this.stats, this.config, this.tickets);
 		this.commands = new CommandRegistry();
-		this.commands.register(new TicketAddCommand(), new TicketClaimCommand(), new TicketAdminCommand(), new TicketRemoveCommand(), new TicketTransferCommand());
+		this.commands.register(new TicketAddCommand(), new TicketClaimCommand(), new TicketAdminCommand(), new TicketStatsCommand(), new TicketRemoveCommand(), new TicketTransferCommand());
 
 		try {
 			this.jda = JDABuilder.createLight(this.config.global().getToken(), EnumSet.of(GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_EXPRESSIONS)).enableCache(CacheFlag.EMOJI, CacheFlag.MEMBER_OVERRIDES).addEventListeners(this.commands, new TicketOpenListener(), new TicketMessageListener(), new TicketPermissionListener()).build().awaitReady();
@@ -74,6 +84,7 @@ public final class TicketBot {
 		}
 
 		this.refresh();
+		this.live.start(this.jda);
 		log.info("TicketBot ready with {} ticket type(s).", this.config.types().size());
 		return true;
 	}

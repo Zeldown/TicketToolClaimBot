@@ -22,6 +22,7 @@ import fr.zeldown.ticketbot.config.TicketTeam;
 import fr.zeldown.ticketbot.config.TypeConfig;
 import fr.zeldown.ticketbot.message.Placeholders;
 import fr.zeldown.ticketbot.message.TicketMessage;
+import fr.zeldown.ticketbot.stats.ChartTheme;
 import lombok.NonNull;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
@@ -66,6 +67,9 @@ public final class TicketAdminCommand implements SlashCommand {
 		this.handlers.put("status", this::status);
 		this.handlers.put("reload", this::reload);
 		this.handlers.put("message", this::message);
+		this.handlers.put("stats sla", this::sla);
+		this.handlers.put("stats font", this::font);
+		this.handlers.put("stats live", this::live);
 		this.handlers.put("type create", this::createType);
 		this.handlers.put("team create", this::createTeam);
 		this.handlers.put("team delete", this::deleteTeam);
@@ -105,6 +109,11 @@ public final class TicketAdminCommand implements SlashCommand {
 				new SubcommandData("message", "Modifier un message").addOptions(new OptionData(OptionType.STRING, "key", "Message à modifier", true).addChoices(Arrays.stream(TicketMessage.values()).map(message -> new Command.Choice(message.getKey(), message.getKey())).collect(Collectors.toList())), scope)
 				)
 		.addSubcommandGroups(
+				new SubcommandGroupData("stats", "Configurer les statistiques").addSubcommands(
+						new SubcommandData("live", "Définir le salon du suivi en direct").addOption(OptionType.CHANNEL, "channel", "Salon du suivi", true),
+						new SubcommandData("sla", "Définir l'objectif de prise en charge, en minutes").addOption(OptionType.INTEGER, "minutes", "Objectif en minutes", true),
+						new SubcommandData("font", "Définir la police des graphiques").addOption(OptionType.STRING, "regular", "Chemin du fichier .ttf normal", true).addOption(OptionType.STRING, "bold", "Chemin du fichier .ttf gras", false)
+						),
 				new SubcommandGroupData("type", "Gérer les types de ticket").addSubcommands(
 						new SubcommandData("create", "Créer un type de ticket").addOption(OptionType.STRING, "id", "Identifiant unique, par exemple bedrock", true)
 						),
@@ -189,6 +198,31 @@ public final class TicketAdminCommand implements SlashCommand {
 
 		final Matcher matcher = Message.MentionType.EMOJI.getPattern().matcher(value);
 		return matcher.matches() ? Long.parseLong(matcher.group(2)) : 0L;
+	}
+
+	private void sla(final SlashCommandInteractionEvent event) {
+		final int minutes = Math.max(1, event.getOption("minutes", OptionMapping::getAsInt));
+		TicketBot.inst().getConfig().global().getStats().setSla(minutes);
+		this.save();
+		this.reply(event, TicketAdminCommand.SUCCESS, "L'objectif de prise en charge est désormais de **" + minutes + " min**.");
+	}
+
+	private void font(final SlashCommandInteractionEvent event) {
+		final String regular = event.getOption("regular", OptionMapping::getAsString).trim();
+		final String bold = event.getOption("bold", "", OptionMapping::getAsString).trim();
+		TicketBot.inst().getConfig().global().getStats().setFont(regular);
+		TicketBot.inst().getConfig().global().getStats().setFontBold(bold);
+		this.save();
+		ChartTheme.load(regular, bold);
+		this.reply(event, TicketAdminCommand.SUCCESS, "La police des graphiques est désormais `" + regular + "`.");
+	}
+
+	private void live(final SlashCommandInteractionEvent event) {
+		final GuildChannelUnion channel = event.getOption("channel", OptionMapping::getAsChannel);
+		TicketBot.inst().getConfig().global().getStats().setChannel(channel.getIdLong());
+		TicketBot.inst().getConfig().global().getStats().setMessage(0L);
+		this.save();
+		this.reply(event, TicketAdminCommand.SUCCESS, "Le suivi en direct sera publié dans " + channel.getAsMention() + ".");
 	}
 
 	private void staff(final SlashCommandInteractionEvent event) {
